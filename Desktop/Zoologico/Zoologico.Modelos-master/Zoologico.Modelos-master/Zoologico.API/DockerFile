@@ -1,0 +1,35 @@
+# --------------------------------------------------------
+# STAGE 1: Build Image (Construye la aplicación)
+# Usamos la imagen oficial de SDK de .NET 8.0 para compilar
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copia los archivos del proyecto API y de Modelos
+# La ruta es relativa a la raíz de la solución
+COPY ["Zoologico.API/Zoologico.API.csproj", "Zoologico.API/"]
+COPY ["Zoologico.Modelos/Zoologico.Modelos.csproj", "Zoologico.Modelos/"]
+COPY ["Zoologico.APITest/Zoologico.APITest.csproj", "Zoologico.APITest/"]
+
+# Restaura las dependencias (NuGet)
+RUN dotnet restore "Zoologico.API/Zoologico.API.csproj"
+
+# Copia todos los archivos de la solución
+COPY . .
+
+# Publica la aplicación
+WORKDIR /src/Zoologico.API
+RUN dotnet publish "Zoologico.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# --------------------------------------------------------
+# STAGE 2: Final Image (Imagen de ejecución ligera)
+# Usamos la imagen de tiempo de ejecución de .NET (más ligera y segura)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+EXPOSE 8080 
+ENV ASPNETCORE_URLS=http://+:8080 # Asegura que la app escuche en el puerto del contenedor
+
+# Copia los archivos publicados desde la etapa de compilación
+COPY --from=build /app/publish .
+
+# Define el punto de entrada de la aplicación
+ENTRYPOINT ["dotnet", "Zoologico.API.dll"]
